@@ -93,7 +93,7 @@ Public Sub ExecCommand(targetSheet As Worksheet)
     mode = modeSheet.Range("C14").Value
     
     If InStr(sheetName, TARGET_SHEET_PREFIX) = 1 Then
-        For i = 2 To targetSheet.Cells(targetSheet.Rows.Count, 1).End(xlUp).row
+        For i = 2 To targetSheet.Cells(targetSheet.Rows.count, 1).End(xlUp).row
 
             ' No列の定義がなくなるまでループ
             If targetSheet.Cells(i, COL_NEW_TYPEDEF_NO) = "" Then
@@ -118,6 +118,7 @@ Public Sub ExecCommand(targetSheet As Worksheet)
                 defCont = m_dbDefDic.GetValue("", targetSheet.Cells(i, COL_NEW_TYPEDEF_NAME))
             End If
             
+
             
             ' エラーじゃない場合
             If defCont <> "" And InStr(defCont, "ERR:") <> 1 Then
@@ -125,6 +126,18 @@ Public Sub ExecCommand(targetSheet As Worksheet)
                 Dim tmp As Variant
                 tmp = Split(defCont, "@")
                 colType = tmp(0)
+                
+                '列タイプが取得できないものは未定項目とする。
+                If targetSheet.Cells(i, COL_NEW_TYPEDEF_TABLE_NAME) <> "" And targetSheet.Cells(i, COL_NEW_TYPEDEF_COLUMN_NAME) <> "" And colType = "" Then
+                    With targetSheet
+                        .Range(.Cells(i, COL_NEW_TYPEDEF_MIN_NO), .Cells(i, COL_NEW_TYPEDEF_MAX_NO)).Interior.Color = RGB(255, 255, 0)
+                    End With
+                Else
+                    With targetSheet
+                        .Range(.Cells(i, COL_NEW_TYPEDEF_MIN_NO), .Cells(i, COL_NEW_TYPEDEF_MAX_NO)).Interior.ColorIndex = 0
+                    End With
+                End If
+                
                 If tmp(1) = "○" Then
                     pkey = True
                 Else
@@ -176,16 +189,13 @@ Public Sub ExecCommand(targetSheet As Worksheet)
                 '===================
                 ' サンプル値の修正
                 '===================
-                sample = RebuildSampleText(sample, dbType, dbLength, codeCont)
+                sample = RebuildSampleText(sample, targetSheet.Cells(i, COL_NEW_TYPEDEF_NAME), dbType, dbLength, codeCont)
 
                 If dbType = "CHAR" Then
                     varchar2Size = dbLength
                     Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_TYPE, "文字列")
                     Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MINLENGTH, varchar2Size)
                     Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, varchar2Size)
-                    
-                    'サンプルの修正
-                    sample = Padding(sample, "X", varchar2Size)
                 
                 ElseIf dbType = "VARCHAR2" Or dbType = "VARCHAR" Or dbType = "VACHAR2" Then '変な間違いに対応（課題96）
                     Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_TYPE, "文字列")
@@ -234,11 +244,7 @@ Public Sub ExecCommand(targetSheet As Worksheet)
                     If dbType = "CHAR" Then
                         Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "半角英数")
                         
-                        If dbLength = 8 And targetSheet.Cells(i, COL_NEW_TYPEDEF_NAME) Like "*日" Then
-                            sample = "20160505"
-                        End If
-                        
-                        If dbLength = 8 And Match("^(\d{4})(\d{2})(\d{2})$", sample) Then
+                        If dbLength = 8 And Match("^20(\d{2})(\d{2})(\d{2})$", sample) Then
                             Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "yyyyMMdd")
                             'データ例
                             Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_DATA_SAMPLE, "'20160505")
@@ -279,27 +285,73 @@ CONTINUE:
     
 End Sub
 
-Private Function RebuildSampleText(origSample As String, dbType As String, dbLength As String, codeDef As String)
-
+Private Function RebuildSampleText(origSample As String, colName As String, dbType As String, dbLength As String, codeDef As String)
+    Dim varchar2Size As Integer
+    Dim i As Long
+    Dim defSheet As Worksheet
+    Set defSheet = ThisWorkbook.Sheets("サンプルデータ定義")
+    
+    RebuildSampleText = origSample
+    
+    'コード定義されているものはそこから選択する。
+    If codeDef <> "" Then
+        RebuildSampleText = Mid(codeDef, 2, InStr(codeDef, "」") - 2)
+        Exit Function
+    End If
+    
+    ' サンプルデータ一覧の完全一致する項目から取得
+    For i = 1 To defSheet.Cells(defSheet.Rows.count, 1).End(xlUp).row
+        If colName = defSheet.Cells(i, 1) And colName = defSheet.Cells(i, 2) = dbType Then
+            RebuildSampleText = defSheet.Cells(i, 3)
+            Exit Function
+        End If
+    Next
+    
+    ' サンプルデータ一覧の後方一致する項目から取得
+    For i = 1 To defSheet.Cells(defSheet.Rows.count, 1).End(xlUp).row
+        If EndWidth(colName, defSheet.Cells(i, 1)) And defSheet.Cells(i, 2) = dbType Then
+            RebuildSampleText = defSheet.Cells(i, 3)
+            Exit Function
+        End If
+    Next
+    
+    If dbType = "CHAR" Then
+        varchar2Size = dbLength
+        'サンプルの修正
+        RebuildSampleText = Padding(origSample, "X", varchar2Size)
+        Exit Function
+    ElseIf dbType = "NUMBER" Then
+        If origSample = "" Then
+            RebuildSampleText = "1"
+            Exit Function
+        End If
+    End If
+    
 End Function
 
-Private Function Padding(target As String, c As String, length As Integer) As String
+Private Function Padding(Target As String, c As String, length As Integer) As String
     Dim base As String, i As Integer
     Dim sjisStr As String
-    sjisStr = StrConv(target, vbFromUnicode)
+    sjisStr = StrConv(Target, vbFromUnicode)
     
     If LenB(sjisStr) < length Then
         For i = 1 To length
             base = base & c
         Next
         
-        Padding = target & Mid(base, 1, length - LenB(sjisStr))
+        Padding = Target & Mid(base, 1, length - LenB(sjisStr))
     Else
-        Padding = target
+        Padding = Target
     End If
     
 End Function
 
+Private Function EndWidth(Target As String, testString As String) As Boolean
+    EndWidth = False
+    If InStr(Target, testString) > 0 And InStr(Target, testString) + Len(testString) - 1 = Len(Target) Then
+        EndWidth = True
+    End If
+End Function
 
 
 '*******************************************************************************
@@ -329,7 +381,7 @@ Private Function HankakuColumn(columnName As String) As Boolean
     HankakuColumn = False
 End Function
 
-Private Function Match(strPattern As String, target As String) As Boolean
+Private Function Match(strPattern As String, Target As String) As Boolean
     Dim RegexObj, i As Long, msg As String
     Set RegexObj = CreateObject("VBScript.RegExp")
 
@@ -337,7 +389,7 @@ Private Function Match(strPattern As String, target As String) As Boolean
         .pattern = strPattern
         .IgnoreCase = False
         .Global = True
-        Match = .Test(target)
+        Match = .Test(Target)
     End With
     Set RegexObj = Nothing
 End Function

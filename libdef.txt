@@ -2,5 +2,12 @@
 ./main.bas
 
 'modules
-./modSample.bas
-
+./CmdAutoGen.cls
+./CmdCodeDef.cls
+./CmdRowAdjust.cls
+./CodeDictionary.cls
+./DBDictionary.cls
+./Logger.bas
+./modFolderPicker.bas
+./RunCommand.bas
+./WorkUtil.bas
