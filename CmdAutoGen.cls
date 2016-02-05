@@ -83,14 +83,9 @@ Public Sub ExecCommand(targetSheet As Worksheet)
     
     sheetName = targetSheet.Name
     
-    ' 辞書を取得
+    ' 辞書
     Dim defCont As String, codeCont As String, varchar2Size As Integer
     Dim colType As String, pkey As Boolean, notnull As Boolean, explain As String, sample As String
-    'モードを取得
-    Dim modeSheet As Worksheet, mode As String
-    Set modeSheet = ThisWorkbook.Worksheets("DB項目チェック")
-    
-    mode = modeSheet.Range("C14").Value
     
     If InStr(sheetName, TARGET_SHEET_PREFIX) = 1 Then
         For i = 2 To targetSheet.Cells(targetSheet.Rows.count, 1).End(xlUp).row
@@ -153,11 +148,11 @@ Public Sub ExecCommand(targetSheet As Worksheet)
                 sample = tmp(5)
                 
                 If notnull Then
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MIN_LOOP, 1)
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MAX_LOOP, 1)
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MIN_LOOP, 1)
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MAX_LOOP, 1)
                 Else
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MIN_LOOP, 0)
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MAX_LOOP, 1)
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MIN_LOOP, 0)
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MAX_LOOP, 1)
                 End If
 
                 Dim dbType As String  'DBのデータ型
@@ -193,87 +188,87 @@ Public Sub ExecCommand(targetSheet As Worksheet)
 
                 If dbType = "CHAR" Then
                     varchar2Size = dbLength
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_TYPE, "文字列")
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MINLENGTH, varchar2Size)
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, varchar2Size)
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_TYPE, "文字列")
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MINLENGTH, varchar2Size)
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, varchar2Size)
                 
                 ElseIf dbType = "VARCHAR2" Or dbType = "VARCHAR" Or dbType = "VACHAR2" Then '変な間違いに対応（課題96）
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_TYPE, "文字列")
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MINLENGTH, "1")
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_TYPE, "文字列")
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MINLENGTH, "1")
                     varchar2Size = dbLength
                     If (varchar2Size Mod 2) > 0 Then
-                        Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, (varchar2Size))
+                        Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, (varchar2Size))
                         
                     ElseIf HankakuColumn(targetSheet.Cells(i, COL_NEW_TYPEDEF_COLUMN_NAME)) Then
-                        Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, (varchar2Size))
+                        Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, (varchar2Size))
                         
                     Else
-                        Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, (varchar2Size / 2))
+                        Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, (varchar2Size / 2))
                     End If
                     
                 ElseIf dbType = "NUMBER" Then
                     If InStr(dbLength, ",") > 0 Then
                         varchar2Size = Mid(dbLength, 1, InStr(dbLength, ",") - 1)
-                        Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_TYPE, "数値")
+                        Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_TYPE, "数値")
                     Else
                         varchar2Size = dbLength
-                        Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_TYPE, "整数")
+                        Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_TYPE, "整数")
                     End If
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MINLENGTH, 1)
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, varchar2Size)
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MINLENGTH, 1)
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, varchar2Size)
  
                 ElseIf dbType = "DATE" Then
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_TYPE, "日時")
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MINLENGTH, 1)
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, 12)
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_TYPE, "日時")
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MINLENGTH, 1)
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_MAXLENGTH, 12)
 
                 Else
                     Call debugLog("シート名「" & targetSheet.Name & "」/ 行「" & i & "」/ 予期せぬ型です:" & targetSheet.Name & ":" & colType & ":" & dbType, ERROR_LOG)
                 End If
                 
                 '説明
-                Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_EXPLAIN, explain)
+                Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_EXPLAIN, explain)
                 
                 'データ例
-                Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_DATA_SAMPLE, sample)
+                Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_DATA_SAMPLE, sample)
                 
                 ' 文字種・書式
                 If codeCont <> "" Then
-                    Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, codeCont & "のいずれか")
+                    Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, codeCont & "のいずれか")
                 Else
                     If dbType = "CHAR" Then
-                        Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "半角英数")
+                        Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "半角英数")
                         
                         If dbLength = 8 And Match("^20(\d{2})(\d{2})(\d{2})$", sample) Then
-                            Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "yyyyMMdd")
+                            Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "yyyyMMdd")
                             'データ例
-                            Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_DATA_SAMPLE, "'20160505")
+                            Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_DATA_SAMPLE, "'20160505")
                         End If
                     
                     ElseIf dbType = "VARCHAR2" Then
                         varchar2Size = dbLength
                         If (varchar2Size Mod 2) > 0 Then
-                            Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "半角英数")
+                            Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "半角英数")
                             
                         ElseIf HankakuColumn(targetSheet.Cells(i, COL_NEW_TYPEDEF_COLUMN_NAME)) Then
-                            Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "半角英数")
+                            Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "半角英数")
                             
                         ElseIf Match("^(\d{4})(\d{2})(\d{2})$", sample) Then
-                            Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "yyyyMMdd")
+                            Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "yyyyMMdd")
                             'データ例
-                            Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_DATA_SAMPLE, "'20160505")
+                            Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_DATA_SAMPLE, "'20160505")
 
                         Else
-                            Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "")
+                            Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "")
                         End If
                         
                     ElseIf dbType = "NUMBER" Then
-                        Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "半角数字")
+                        Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "半角数字")
                     
                     ElseIf dbType = "DATE" Then
-                        Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "")
+                        Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "")
                         'データ例
-                        Call SetCellValue(mode, targetSheet, i, COL_NEW_TYPEDEF_DATA_SAMPLE, "2002-05-30T09:30:10+06:00")
+                        Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_DATA_SAMPLE, "2002-05-30T09:30:10+06:00")
 
                     End If
                 End If
@@ -357,17 +352,37 @@ End Function
 '*******************************************************************************
 ' セルに対して設定する。
 '*******************************************************************************
-Private Sub SetCellValue(mode As String, shet As Worksheet, rowIdx As Integer, colIdx As Integer, celVal As Variant)
-    If mode = "1" Then
-        shet.Cells(rowIdx, colIdx) = celVal
+Private Sub SetCellValue(shet As Worksheet, rowIdx As Integer, colIdx As Integer, celVal As Variant)
+
+    'モードを取得
+    Dim modeSheet As Worksheet, upmode As String, procmode As String
+    Set modeSheet = ThisWorkbook.Worksheets("DB項目チェック")
     
-    ElseIf mode = "2" Then
-        If shet.Cells(rowIdx, colIdx) = "" Then
+    '更新モード
+    upmode = modeSheet.Range("C14").Value
+    '処理モード
+    procmode = modeSheet.Range("C22").Value
+
+
+    If upmode = "1" Then
+        If procmode = "1" Then
             shet.Cells(rowIdx, colIdx) = celVal
         End If
+        Call OutputCheckLog(shet, rowIdx, colIdx, celVal)
+    
+    ElseIf upmode = "2" Then
+        If shet.Cells(rowIdx, colIdx) = "" And celVal <> ""Then
+            If procmode = "1" Then
+                shet.Cells(rowIdx, colIdx) = celVal
+            End If
+            Call OutputCheckLog(shet, rowIdx, colIdx, celVal)
+        End If
 
-    ElseIf mode = "3" Then
+    ElseIf upmode = "3" Then
         If shet.Cells(rowIdx, colIdx) <> celVal Then
+            If procmode = "1" Then
+                shet.Cells(rowIdx, colIdx) = celVal
+            End If
             Call OutputCheckLog(shet, rowIdx, colIdx, celVal)
         End If
     End If
