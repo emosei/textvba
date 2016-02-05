@@ -237,12 +237,11 @@ Public Sub ExecCommand(targetSheet As Worksheet)
                     Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, codeCont & "のいずれか")
                 Else
                     If dbType = "CHAR" Then
-                        Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "半角英数")
-                        
+
                         If dbLength = 8 And Match("^20(\d{2})(\d{2})(\d{2})$", sample) Then
                             Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "yyyyMMdd")
-                            'データ例
-                            Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_DATA_SAMPLE, "'20160505")
+												Else
+														Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "半角英数")
                         End If
                     
                     ElseIf dbType = "VARCHAR2" Then
@@ -255,8 +254,6 @@ Public Sub ExecCommand(targetSheet As Worksheet)
                             
                         ElseIf Match("^(\d{4})(\d{2})(\d{2})$", sample) Then
                             Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "yyyyMMdd")
-                            'データ例
-                            Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_DATA_SAMPLE, "'20160505")
 
                         Else
                             Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "")
@@ -267,9 +264,6 @@ Public Sub ExecCommand(targetSheet As Worksheet)
                     
                     ElseIf dbType = "DATE" Then
                         Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_CHAR_FORMAT, "")
-                        'データ例
-                        Call SetCellValue(targetSheet, i, COL_NEW_TYPEDEF_DATA_SAMPLE, "2002-05-30T09:30:10+06:00")
-
                     End If
                 End If
                 
@@ -296,7 +290,7 @@ Private Function RebuildSampleText(origSample As String, colName As String, dbTy
     
     ' サンプルデータ一覧の完全一致する項目から取得
     For i = 1 To defSheet.Cells(defSheet.Rows.count, 1).End(xlUp).row
-        If colName = defSheet.Cells(i, 1) And colName = defSheet.Cells(i, 2) = dbType Then
+        If colName = defSheet.Cells(i, 1) And defSheet.Cells(i, 2) = dbType Then
             RebuildSampleText = defSheet.Cells(i, 3)
             Exit Function
         End If
@@ -320,6 +314,8 @@ Private Function RebuildSampleText(origSample As String, colName As String, dbTy
             RebuildSampleText = "1"
             Exit Function
         End If
+    ElseIf dbType = "DATE" Then
+        RebuildSampleText = "2002-05-30T09:30:10+06:00"
     End If
     
 End Function
@@ -355,7 +351,7 @@ End Function
 Private Sub SetCellValue(shet As Worksheet, rowIdx As Integer, colIdx As Integer, celVal As Variant)
 
     'モードを取得
-    Dim modeSheet As Worksheet, upmode As String, procmode As String
+    Dim modeSheet As Worksheet, upmode As String, procmode As String, setVal As String
     Set modeSheet = ThisWorkbook.Worksheets("DB項目チェック")
     
     '更新モード
@@ -363,27 +359,34 @@ Private Sub SetCellValue(shet As Worksheet, rowIdx As Integer, colIdx As Integer
     '処理モード
     procmode = modeSheet.Range("C22").Value
 
+    If IsNumeric(celVal) Then
+        setVal = "'" & celVal
+    Else
+        setVal = celVal
+    End If
 
     If upmode = "1" Then
         If procmode = "1" Then
-            shet.Cells(rowIdx, colIdx) = celVal
+            shet.Cells(rowIdx, colIdx) = setVal
         End If
-        Call OutputCheckLog(shet, rowIdx, colIdx, celVal)
+        Call OutputCheckLog(shet, rowIdx, colIdx, setVal)
     
     ElseIf upmode = "2" Then
-        If shet.Cells(rowIdx, colIdx) = "" And celVal <> ""Then
+        If shet.Cells(rowIdx, colIdx) = "" And setVal <> "" Then
+            Call OutputCheckLog(shet, rowIdx, colIdx, setVal)
             If procmode = "1" Then
-                shet.Cells(rowIdx, colIdx) = celVal
+                shet.Cells(rowIdx, colIdx) = setVal
             End If
-            Call OutputCheckLog(shet, rowIdx, colIdx, celVal)
+            
         End If
 
     ElseIf upmode = "3" Then
-        If shet.Cells(rowIdx, colIdx) <> celVal Then
+        If CStr(shet.Cells(rowIdx, colIdx)) <> CStr(celVal) Then
+            Call OutputCheckLog(shet, rowIdx, colIdx, setVal)
             If procmode = "1" Then
-                shet.Cells(rowIdx, colIdx) = celVal
+                shet.Cells(rowIdx, colIdx) = setVal
             End If
-            Call OutputCheckLog(shet, rowIdx, colIdx, celVal)
+            
         End If
     End If
     
