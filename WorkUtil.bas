@@ -203,6 +203,16 @@ Public Sub Doシート名から要素一覧作成(targetPrefix As String)
         Exit Sub
     End If
     
+    Dim files As Collection
+    Set files = New Collection
+    Dim vFileName As Variant
+    Do While strFileName <> ""
+        Call files.Add(strFileName)
+        ' 次のファイル名を参照
+        strFileName = Dir
+    Loop
+    'For Each vFileName In files
+    
     Set xlAPP = Application
     With xlAPP
         .ScreenUpdating = False             ' 画面描画停止
@@ -213,7 +223,7 @@ Public Sub Doシート名から要素一覧作成(targetPrefix As String)
     On Error GoTo Error_Handler
         
     ' 指定フォルダの全Excelワークブックについて繰り返す
-    Do While strFileName <> ""
+    For Each vFileName In files
         ' Escキー打鍵判定
         DoEvents
         If swESC = True Then
@@ -228,12 +238,10 @@ Public Sub Doシート名から要素一覧作成(targetPrefix As String)
 
         '-----------------------------------------------------------------------
         ' 検索した１ファイル単位の処理
-        Call WB要素一覧作成処理(xlAPP, strPathName, strFileName, targetPrefix)
+        Call WB要素一覧作成処理(xlAPP, strPathName, CStr(vFileName), targetPrefix)
         
         '-----------------------------------------------------------------------
-        ' 次のファイル名を参照
-        strFileName = Dir
-    Loop
+    Next
     
     GoTo Sub_EXIT
     
@@ -287,14 +295,13 @@ Private Sub WB要素一覧作成処理(xlAPP As Application, _
     ' ステータスバーに処理ファイル名を表示
     xlAPP.StatusBar = strFileName & " 処理中..."
     ' ワークブックを開く
-    Set objWBK = Workbooks.Open(fileName:=strPathName & cnsYEN & strFileName, _
-                                UpdateLinks:=False, _
-                                ReadOnly:=False)
+    Set objWBK = OpenWorkBook(strPathName & cnsYEN & strFileName, False, False)
+    If Not objWBK Is Nothing Then
     
-    Call Do要素一覧作成処理(objWBK, targetPrefix)
+        Call Do要素一覧作成処理(objWBK, targetPrefix)
+        objWBK.Close SaveChanges:=True
 
-
-    objWBK.Close SaveChanges:=True
+    End If
     
     GoTo Sub_EXIT
 
@@ -322,11 +329,14 @@ Private Sub Do要素一覧作成処理(objWBK As Workbook, targetPrefix As String)
     '要素一覧（型一覧）シート取得
     Set elmListSheet = GetTypeListSheet(objWBK)
     
+    If elmListSheet Is Nothing Then
+        Exit Sub
+    End If
     '---------------------------------------------------------------------------
     ' 要素リストのエントリーを削除
     '---------------------------------------------------------------------------
     Dim i As Integer
-    Dim maxNum As Integer: maxNum = elmListSheet.Cells(elmListSheet.Rows.Count, 1).End(xlUp).row
+    Dim maxNum As Integer: maxNum = elmListSheet.Cells(elmListSheet.Rows.count, 1).End(xlUp).row
     
     If maxNum < TEMPLATE_TYPE_LIST_SHEET_MAX_ROW Then
         maxNum = TEMPLATE_TYPE_LIST_SHEET_MAX_ROW
@@ -428,6 +438,16 @@ Public Sub 要素一覧からシート作成()
         Exit Sub
     End If
     
+    Dim files As Collection
+    Set files = New Collection
+    Dim vFileName As Variant
+    Do While strFileName <> ""
+        Call files.Add(strFileName)
+        ' 次のファイル名を参照
+        strFileName = Dir
+    Loop
+    'For Each vFileName In files
+    
     Set xlAPP = Application
     With xlAPP
         .ScreenUpdating = False             ' 画面描画停止
@@ -438,33 +458,33 @@ Public Sub 要素一覧からシート作成()
     On Error GoTo Error_Handler
     
     ' テンプレートワークブックを開く
-    Set templateWBK = Workbooks.Open(fileName:=TEMPLATE_FILE_PATH, _
-                                UpdateLinks:=False, _
-                                ReadOnly:=True)
+    Set templateWBK = OpenWorkBook(TEMPLATE_FILE_PATH, False, True)
 
-    ' 指定フォルダの全Excelワークブックについて繰り返す
-    Do While strFileName <> ""
-        ' Escキー打鍵判定
-        DoEvents
-        If swESC = True Then
-            ' 中断するのかをメッセージで確認
-            If MsgBox("中断キーが押されました。ここで終了しますか？", _
-                vbInformation + vbYesNo) = vbYes Then
-                GoTo Error_Handler
-            Else
-                swESC = False
+    If Not templateWBK Is Nothing Then
+    
+        ' 指定フォルダの全Excelワークブックについて繰り返す
+        For Each vFileName In files
+            ' Escキー打鍵判定
+            DoEvents
+            If swESC = True Then
+                ' 中断するのかをメッセージで確認
+                If MsgBox("中断キーが押されました。ここで終了しますか？", _
+                    vbInformation + vbYesNo) = vbYes Then
+                    GoTo Error_Handler
+                Else
+                    swESC = False
+                End If
             End If
-        End If
-
-        '-----------------------------------------------------------------------
-        ' 検索した１ファイル単位の処理
-        Call WB型一覧シート作成処理(xlAPP, templateWBK, strPathName, strFileName)
-        
-        '-----------------------------------------------------------------------
-        ' 次のファイル名を参照
-        strFileName = Dir
-    Loop
-    templateWBK.Close SaveChanges:=False
+    
+            '-----------------------------------------------------------------------
+            ' 検索した１ファイル単位の処理
+            Call WB型一覧シート作成処理(xlAPP, templateWBK, strPathName, CStr(vFileName))
+            
+            '-----------------------------------------------------------------------
+        Next
+        templateWBK.Close SaveChanges:=False
+    
+    End If
     
     GoTo Sub_EXIT
     
@@ -517,43 +537,46 @@ Private Sub WB型一覧シート作成処理(xlAPP As Application, _
     ' ステータスバーに処理ファイル名を表示
     xlAPP.StatusBar = strFileName & " 型一覧反映中"
     ' ワークブックを開く
-    Set objWBK = Workbooks.Open(fileName:=strPathName & cnsYEN & strFileName, _
-                                UpdateLinks:=False, _
-                                ReadOnly:=False)
-    '要素一覧（型一覧）シート取得
-    Dim elmListSheet As Worksheet
-    Set elmListSheet = GetTypeListSheet(objWBK)
-
-    Dim i As Integer, _
-        typeName As String, _
-        targetSheetName As String, _
-        targetSheet As Worksheet
-
-    For i = 2 To elmListSheet.Cells(elmListSheet.Rows.Count, 1).End(xlUp).row
-        '型名
-        typeName = elmListSheet.Cells(i, COL_NEW_TYPEDEF_NAME)
-        'シート名
-        targetSheetName = TARGET_SHEET_PREFIX_NEW & typeName
-
-        ' 存在しない場合にテンプレートから作成する。
-        If Not ContainsSheet(objWBK, targetSheetName) Then
-            ' コピー実行
-            templateWBK.Worksheets(TEMPLATE_SHEET_NAME).Copy After:=objWBK.Worksheets(objWBK.Worksheets.Count)
-            objWBK.Worksheets(objWBK.Worksheets.Count).Name = targetSheetName
-            Set targetSheet = objWBK.Sheets(targetSheetName)
-            If Not targetSheet Is Nothing Then
-                '---------------------------------------------------------------------------
-                ' 要素リストのエントリーを削除
-                '---------------------------------------------------------------------------
-                Dim j As Integer
-                For j = targetSheet.Cells(targetSheet.Rows.Count, 1).End(xlUp).row To 2 Step -1
-                    targetSheet.Rows(j).Delete
-                Next
+    Set objWBK = OpenWorkBook(strPathName & cnsYEN & strFileName, False, False)
+    
+    If Not objWBK Is Nothing Then
+    
+        '要素一覧（型一覧）シート取得
+        Dim elmListSheet As Worksheet
+        Set elmListSheet = GetTypeListSheet(objWBK)
+    
+        Dim i As Integer, _
+            typeName As String, _
+            targetSheetName As String, _
+            targetSheet As Worksheet
+    
+        For i = 2 To elmListSheet.Cells(elmListSheet.Rows.count, 1).End(xlUp).row
+            '型名
+            typeName = elmListSheet.Cells(i, COL_NEW_TYPEDEF_NAME)
+            'シート名
+            targetSheetName = TARGET_SHEET_PREFIX_NEW & typeName
+    
+            ' 存在しない場合にテンプレートから作成する。
+            If Not ContainsSheet(objWBK, targetSheetName) Then
+                ' コピー実行
+                templateWBK.Worksheets(TEMPLATE_SHEET_NAME).Copy After:=objWBK.Worksheets(objWBK.Worksheets.count)
+                objWBK.Worksheets(objWBK.Worksheets.count).Name = targetSheetName
+                Set targetSheet = objWBK.Sheets(targetSheetName)
+                If Not targetSheet Is Nothing Then
+                    '---------------------------------------------------------------------------
+                    ' 要素リストのエントリーを削除
+                    '---------------------------------------------------------------------------
+                    Dim j As Integer
+                    For j = targetSheet.Cells(targetSheet.Rows.count, 1).End(xlUp).row To 2 Step -1
+                        targetSheet.Rows(j).Delete
+                    Next
+                End If
             End If
-        End If
-    Next
-
-    objWBK.Close SaveChanges:=True
+        Next
+    
+        objWBK.Close SaveChanges:=True
+    
+    End If
     
     GoTo Sub_EXIT
     
@@ -584,43 +607,46 @@ Private Sub WBデータベース項目(xlAPP As Application, _
     ' ステータスバーに処理ファイル名を表示
     xlAPP.StatusBar = strFileName & " 型一覧反映中"
     ' ワークブックを開く
-    Set objWBK = Workbooks.Open(fileName:=strPathName & cnsYEN & strFileName, _
-                                UpdateLinks:=False, _
-                                ReadOnly:=False)
-    '要素一覧（型一覧）シート取得
-    Dim elmListSheet As Worksheet
-    Set elmListSheet = GetTypeListSheet(objWBK)
-
-    Dim i As Integer, _
-        typeName As String, _
-        targetSheetName As String, _
-        targetSheet As Worksheet
-
-    For i = 2 To elmListSheet.Cells(elmListSheet.Rows.Count, 1).End(xlUp).row
-        '型名
-        typeName = elmListSheet.Cells(i, COL_NEW_TYPEDEF_NAME)
-        'シート名
-        targetSheetName = TARGET_SHEET_PREFIX_NEW & typeName
-
-        ' 存在しない場合にテンプレートから作成する。
-        If Not ContainsSheet(objWBK, targetSheetName) Then
-            ' コピー実行
-            templateWBK.Worksheets(TEMPLATE_SHEET_NAME).Copy After:=objWBK.Worksheets(objWBK.Worksheets.Count)
-            objWBK.Worksheets(objWBK.Worksheets.Count).Name = targetSheetName
-            Set targetSheet = objWBK.Sheets(targetSheetName)
-            If Not targetSheet Is Nothing Then
-                '---------------------------------------------------------------------------
-                ' 要素リストのエントリーを削除
-                '---------------------------------------------------------------------------
-                Dim j As Integer
-                For j = targetSheet.Cells(targetSheet.Rows.Count, 1).End(xlUp).row To 2 Step -1
-                    targetSheet.Rows(j).Delete
-                Next
+    Set objWBK = OpenWorkBook(strPathName & cnsYEN & strFileName, False, False)
+    
+    If Not objWBK Is Nothing Then
+    
+        '要素一覧（型一覧）シート取得
+        Dim elmListSheet As Worksheet
+        Set elmListSheet = GetTypeListSheet(objWBK)
+    
+        Dim i As Integer, _
+            typeName As String, _
+            targetSheetName As String, _
+            targetSheet As Worksheet
+    
+        For i = 2 To elmListSheet.Cells(elmListSheet.Rows.count, 1).End(xlUp).row
+            '型名
+            typeName = elmListSheet.Cells(i, COL_NEW_TYPEDEF_NAME)
+            'シート名
+            targetSheetName = TARGET_SHEET_PREFIX_NEW & typeName
+    
+            ' 存在しない場合にテンプレートから作成する。
+            If Not ContainsSheet(objWBK, targetSheetName) Then
+                ' コピー実行
+                templateWBK.Worksheets(TEMPLATE_SHEET_NAME).Copy After:=objWBK.Worksheets(objWBK.Worksheets.count)
+                objWBK.Worksheets(objWBK.Worksheets.count).Name = targetSheetName
+                Set targetSheet = objWBK.Sheets(targetSheetName)
+                If Not targetSheet Is Nothing Then
+                    '---------------------------------------------------------------------------
+                    ' 要素リストのエントリーを削除
+                    '---------------------------------------------------------------------------
+                    Dim j As Integer
+                    For j = targetSheet.Cells(targetSheet.Rows.count, 1).End(xlUp).row To 2 Step -1
+                        targetSheet.Rows(j).Delete
+                    Next
+                End If
             End If
-        End If
-    Next
-
-    objWBK.Close SaveChanges:=True
+        Next
+    
+        objWBK.Close SaveChanges:=True
+    
+    End If
     
     GoTo Sub_EXIT
     
@@ -745,7 +771,7 @@ Public Sub 共通型抽出処理()
         MsgBox "このフォルダにはExcelワークブックは存在しません。"
         Exit Sub
     End If
-    
+      
     Set xlAPP = Application
     With xlAPP
         .ScreenUpdating = False             ' 画面描画停止
@@ -757,42 +783,44 @@ Public Sub 共通型抽出処理()
     
     Call LogStart("共通型抽出処理", "")
     ' テンプレートワークブックを開く
-    Set templateWBK = Workbooks.Open(fileName:=TEMPLATE_FILE_PATH, _
-                                UpdateLinks:=False, _
-                                ReadOnly:=True)
+    Set templateWBK = OpenWorkBook(TEMPLATE_FILE_PATH, False, True)
+    
+    If Not templateWBK Is Nothing Then
 
-    Set targetFiles = New Collection
-    targetFiles.Add (strFileName)
-    ' 指定フォルダの全Excelワークブックについて繰り返す
-    Do While strFileName <> ""
+        Set targetFiles = New Collection
         targetFiles.Add (strFileName)
-        ' 次のファイル名を参照
-        strFileName = Dir
-    Loop
-    
-    ' 指定フォルダの全Excelワークブックについて繰り返す
-    Dim aFile As Variant
-    For Each aFile In targetFiles
-        ' Escキー打鍵判定
-        DoEvents
-        If swESC = True Then
-            ' 中断するのかをメッセージで確認
-            If MsgBox("中断キーが押されました。ここで終了しますか？", _
-                vbInformation + vbYesNo) = vbYes Then
-                GoTo Error_Handler
-            Else
-                swESC = False
+        ' 指定フォルダの全Excelワークブックについて繰り返す
+        Do While strFileName <> ""
+            targetFiles.Add (strFileName)
+            ' 次のファイル名を参照
+            strFileName = Dir
+        Loop
+        
+        ' 指定フォルダの全Excelワークブックについて繰り返す
+        Dim aFile As Variant
+        For Each aFile In targetFiles
+            ' Escキー打鍵判定
+            DoEvents
+            If swESC = True Then
+                ' 中断するのかをメッセージで確認
+                If MsgBox("中断キーが押されました。ここで終了しますか？", _
+                    vbInformation + vbYesNo) = vbYes Then
+                    GoTo Error_Handler
+                Else
+                    swESC = False
+                End If
             End If
-        End If
-        '-----------------------------------------------------------------------
-        ' 検索した１ファイル単位の処理
-        Call WB共通型抽出処理(xlAPP, templateWBK, strPathName, CStr(aFile))
-        '-----------------------------------------------------------------------
-
-    Next
-
-    templateWBK.Close SaveChanges:=False
+            '-----------------------------------------------------------------------
+            ' 検索した１ファイル単位の処理
+            Call WB共通型抽出処理(xlAPP, templateWBK, strPathName, CStr(aFile))
+            '-----------------------------------------------------------------------
     
+        Next
+    
+        templateWBK.Close SaveChanges:=False
+    
+    End If
+
     GoTo Sub_EXIT
     
 '----------------
@@ -842,23 +870,25 @@ Private Sub WB共通型抽出処理(xlAPP As Application, _
     ' ステータスバーに処理ファイル名を表示
     xlAPP.StatusBar = strFileName & " 処理中．．．"
     ' ワークブックを開く
-    Set objWBK = Workbooks.Open(fileName:=strPathName & cnsYEN & strFileName, _
-                                UpdateLinks:=False, _
-                                ReadOnly:=False)
+    Set objWBK = OpenWorkBook(strPathName & cnsYEN & strFileName, False, False)
     
-    If Not ContainsSheet(objWBK, SHEET_NAME_COVER_NEW) Then
-        objWBK.Close SaveChanges:=False
-        GoTo Sub_EXIT
-        Exit Sub
+    If Not objWBK Is Nothing Then
+    
+        If Not ContainsSheet(objWBK, SHEET_NAME_COVER_NEW) Then
+            objWBK.Close SaveChanges:=False
+            GoTo Sub_EXIT
+            Exit Sub
+        End If
+        
+        '---------------------------------------------------------------------------
+        ' シート毎に処理
+        '---------------------------------------------------------------------------
+        Call 移行_共通型定義(objWBK, strPathName)
+        
+        objWBK.Close SaveChanges:=True
+
     End If
     
-    '---------------------------------------------------------------------------
-    ' シート毎に処理
-    '---------------------------------------------------------------------------
-    Call 移行_共通型定義(objWBK, strPathName)
-    
-    objWBK.Close SaveChanges:=True
-
     GoTo Sub_EXIT
     
 Error_Handler:
@@ -900,7 +930,7 @@ Public Sub 移行()
         MsgBox "このフォルダにはExcelワークブックは存在しません。"
         Exit Sub
     End If
-    
+
     Set xlAPP = Application
     With xlAPP
         .ScreenUpdating = False             ' 画面描画停止
@@ -913,40 +943,42 @@ Public Sub 移行()
     Call LogStart("移行", strFileName)
     
     ' テンプレートワークブックを開く
-    Set templateWBK = Workbooks.Open(fileName:=TEMPLATE_FILE_PATH, _
-                                UpdateLinks:=False, _
-                                ReadOnly:=True)
-
-    Set targetFiles = New Collection
-    ' 指定フォルダの全Excelワークブックについて繰り返す
-    Do While strFileName <> ""
-        targetFiles.Add (strFileName)
-        ' 次のファイル名を参照
-        strFileName = Dir
-    Loop
+    Set templateWBK = OpenWorkBook(TEMPLATE_FILE_PATH, False, True)
     
-    ' 指定フォルダの全Excelワークブックについて繰り返す
-    Dim aFile As Variant
-    For Each aFile In targetFiles
-        ' Escキー打鍵判定
-        DoEvents
-        If swESC = True Then
-            ' 中断するのかをメッセージで確認
-            If MsgBox("中断キーが押されました。ここで終了しますか？", _
-                vbInformation + vbYesNo) = vbYes Then
-                GoTo Error_Handler
-            Else
-                swESC = False
+    If Not templateWBK Is Nothing Then
+
+        Set targetFiles = New Collection
+        ' 指定フォルダの全Excelワークブックについて繰り返す
+        Do While strFileName <> ""
+            targetFiles.Add (strFileName)
+            ' 次のファイル名を参照
+            strFileName = Dir
+        Loop
+        
+        ' 指定フォルダの全Excelワークブックについて繰り返す
+        Dim aFile As Variant
+        For Each aFile In targetFiles
+            ' Escキー打鍵判定
+            DoEvents
+            If swESC = True Then
+                ' 中断するのかをメッセージで確認
+                If MsgBox("中断キーが押されました。ここで終了しますか？", _
+                    vbInformation + vbYesNo) = vbYes Then
+                    GoTo Error_Handler
+                Else
+                    swESC = False
+                End If
             End If
-        End If
-        '-----------------------------------------------------------------------
-        ' 検索した１ファイル単位の処理
-        Call WB移行(xlAPP, templateWBK, strPathName, CStr(aFile))
-        '-----------------------------------------------------------------------
-
-    Next
-
-    templateWBK.Close SaveChanges:=False
+            '-----------------------------------------------------------------------
+            ' 検索した１ファイル単位の処理
+            Call WB移行(xlAPP, templateWBK, strPathName, CStr(aFile))
+            '-----------------------------------------------------------------------
+    
+        Next
+    
+        templateWBK.Close SaveChanges:=False
+    
+    End If
     
     GoTo Sub_EXIT
     
@@ -993,46 +1025,48 @@ Private Sub WB移行(xlAPP As Application, _
     '---------------------------------------------------------------------------
     Dim objWBK As Workbook          ' ワークブックObject
 
+    Call LogStart("WB移行", strFileName)
+    
     ' ステータスバーに処理ファイル名を表示
     xlAPP.StatusBar = strFileName & " 処理中．．．"
     ' ワークブックを開く
-    Set objWBK = Workbooks.Open(fileName:=strPathName & cnsYEN & strFileName, _
-                                UpdateLinks:=False, _
-                                ReadOnly:=False)
-                           
-    Call LogStart("WB移行", strFileName)
+    Set objWBK = OpenWorkBook(strPathName & cnsYEN & strFileName, False, False)
     
-    If Not ContainsSheet(objWBK, SHEET_NAME_INOUT_OLD) Then
-        objWBK.Close SaveChanges:=False
-        GoTo Sub_EXIT
-        Exit Sub
+    If Not objWBK Is Nothing Then
+        
+        If Not ContainsSheet(objWBK, SHEET_NAME_INOUT_OLD) Then
+            objWBK.Close SaveChanges:=False
+            GoTo Sub_EXIT
+            Exit Sub
+        End If
+        
+        '---------------------------------------------------------------------------
+        ' シート毎に移行
+        '---------------------------------------------------------------------------
+        Call 移行_表紙(objWBK, templateWBK)
+        Call 移行_改訂履歴(objWBK, templateWBK)
+        Call 移行_参照ファイル一覧(objWBK, templateWBK)
+        Call 移行_共通情報(objWBK, templateWBK)
+        Call 移行_型一覧(objWBK, templateWBK)
+        Call 移行_入出力定義(objWBK, templateWBK)
+        Call 移行_型シート(objWBK, templateWBK)
+        
+        '---------------------------------------------------------------------------
+        ' 型一覧の生成
+        '---------------------------------------------------------------------------
+        Call Do要素一覧作成処理(objWBK, TARGET_SHEET_PREFIX_NEW)
+            
+        Call 移行_共通型定義(objWBK, strPathName)
+        '---------------------------------------------------------------------------
+        ' 集約シートの削除
+        '---------------------------------------------------------------------------
+        Call DiscardSheet(GetSummarySheet(objWBK))
+    
+        
+        objWBK.Close SaveChanges:=True
+
     End If
     
-    '---------------------------------------------------------------------------
-    ' シート毎に移行
-    '---------------------------------------------------------------------------
-    Call 移行_表紙(objWBK, templateWBK)
-    Call 移行_改訂履歴(objWBK, templateWBK)
-    Call 移行_参照ファイル一覧(objWBK, templateWBK)
-    Call 移行_共通情報(objWBK, templateWBK)
-    Call 移行_型一覧(objWBK, templateWBK)
-    Call 移行_入出力定義(objWBK, templateWBK)
-    Call 移行_型シート(objWBK, templateWBK)
-    
-    '---------------------------------------------------------------------------
-    ' 型一覧の生成
-    '---------------------------------------------------------------------------
-    Call Do要素一覧作成処理(objWBK, TARGET_SHEET_PREFIX_NEW)
-        
-    Call 移行_共通型定義(objWBK, strPathName)
-    '---------------------------------------------------------------------------
-    ' 集約シートの削除
-    '---------------------------------------------------------------------------
-    Call DiscardSheet(GetSummarySheet(objWBK))
-
-    
-    objWBK.Close SaveChanges:=True
-
     GoTo Sub_EXIT
     
 Error_Handler:
@@ -1267,7 +1301,7 @@ Private Sub 移行_型一覧(targetWBK As Workbook, templateWBK As Workbook)
     ' 要素リストのエントリーを削除
     '---------------------------------------------------------------------------
     Dim i As Integer
-    For i = newWS.Cells(newWS.Rows.Count, 1).End(xlUp).row To 2 Step -1
+    For i = newWS.Cells(newWS.Rows.count, 1).End(xlUp).row To 2 Step -1
         newWS.Rows(i).Delete
     Next
     
@@ -1337,12 +1371,12 @@ Private Sub 移行_入出力定義(targetWBK As Workbook, templateWBK As Workbook)
     ' 新シートの入出力定義のエントリーを削除
     '---------------------------------------------------------------------------
     Dim i As Integer
-    For i = newWS.Cells(newWS.Rows.Count, 1).End(xlUp).row To 2 Step -1
+    For i = newWS.Cells(newWS.Rows.count, 1).End(xlUp).row To 2 Step -1
         newWS.Rows(i).Delete
     Next
     
     Dim j As Integer
-    For j = 2 To oldWS.Cells(oldWS.Rows.Count, 1).End(xlUp).row
+    For j = 2 To oldWS.Cells(oldWS.Rows.count, 1).End(xlUp).row
         newWS.Cells(j, COL_NEW_IO_NO).Value = "=ROW()-1"
         newWS.Cells(j, COL_NEW_IO_IO).Value = oldWS.Cells(j, COL_OLD_IO_IO).Value
         newWS.Cells(j, COL_NEW_IO_ROOT_ELEMENT_ID).Value = oldWS.Cells(j, COL_OLD_IO_ROOT_ELEMENT_ID).Value
@@ -1375,16 +1409,16 @@ Private Sub 移行_型シート(targetWBK As Workbook, templateWBK As Workbook)
     '▼移行要否チェック
     '-------------------
     '旧の名称のシートが存在する場合に実施する。
-    Dim Exists As Boolean: Exists = False
+    Dim exists As Boolean: exists = False
     Dim aSheet As Worksheet
     For Each aSheet In targetWBK.Sheets
         If InStr(aSheet.Name, TARGET_SHEET_PREFIX_OLD) = 1 Then
-            Exists = True
+            exists = True
             Exit For
         End If
     Next
     
-    If Not Exists Then
+    If Not exists Then
         Exit Sub
     End If
     
@@ -1409,8 +1443,8 @@ Private Sub 移行_型シート(targetWBK As Workbook, templateWBK As Workbook)
                 ' 存在しない場合にテンプレートから作成する。
                 If Not ContainsSheet(targetWBK, newSheetName) Then
                     ' コピー実行
-                    templateWBK.Worksheets(TEMPLATE_SHEET_NAME).Copy After:=targetWBK.Worksheets(targetWBK.Worksheets.Count)
-                    targetWBK.Worksheets(targetWBK.Worksheets.Count).Name = newSheetName
+                    templateWBK.Worksheets(TEMPLATE_SHEET_NAME).Copy After:=targetWBK.Worksheets(targetWBK.Worksheets.count)
+                    targetWBK.Worksheets(targetWBK.Worksheets.count).Name = newSheetName
                     Set newWS = targetWBK.Sheets(newSheetName)
 
                     '---------------------------------------------------------------------------
@@ -1425,7 +1459,7 @@ Private Sub 移行_型シート(targetWBK As Workbook, templateWBK As Workbook)
                     ' データ移行
                     '---------------------------------------------------------------------------
                     Dim j As Integer
-                    For j = 2 To oldWS.Cells(oldWS.Rows.Count, 1).End(xlUp).row
+                    For j = 2 To oldWS.Cells(oldWS.Rows.count, 1).End(xlUp).row
                         
                         newWS.Cells(j, COL_NEW_TYPEDEF_NO).Value = "=ROW()-1"    '項番
                         newWS.Cells(j, COL_NEW_TYPEDEF_NAME).Value = oldWS.Cells(j, COL_OLD_TYPEDEF_NAME).Value   '項目名
@@ -1477,8 +1511,8 @@ Private Sub 移行_型シート(targetWBK As Workbook, templateWBK As Workbook)
                     '---------------------------------------------------------------------------
                     ' 不要な行の削除
                     '---------------------------------------------------------------------------
-                    If newWS.Cells(newWS.Rows.Count, 1).End(xlUp).row < TEMPLATE_TYPE_DEF_SHEET_MAX_ROW Then
-                        For j = TEMPLATE_TYPE_LIST_SHEET_MAX_ROW To newWS.Cells(newWS.Rows.Count, 1).End(xlUp).row + 1 Step -1
+                    If newWS.Cells(newWS.Rows.count, 1).End(xlUp).row < TEMPLATE_TYPE_DEF_SHEET_MAX_ROW Then
+                        For j = TEMPLATE_TYPE_LIST_SHEET_MAX_ROW To newWS.Cells(newWS.Rows.count, 1).End(xlUp).row + 1 Step -1
                             newWS.Rows(j).Delete
                         Next
                     End If
@@ -1533,7 +1567,7 @@ Private Function GetCommonTypes() As Collection
     Set GetCommonTypes = New Collection
     
     Dim i As Integer
-    For i = 3 To defSheet.Cells(defSheet.Rows.Count, 3).End(xlUp).row
+    For i = 3 To defSheet.Cells(defSheet.Rows.count, 3).End(xlUp).row
         typeId = defSheet.Cells(i, 2)
         typeName = defSheet.Cells(i, 3)
         If typeId <> "" And typeName <> "" Then
@@ -1553,6 +1587,7 @@ Private Sub 移行_共通型定義(targetWBK As Workbook, strPathName As String)
     Set CommonTypes = GetCommonTypes()
     
     Dim aSheet As Worksheet
+    ' 一覧作成用参照型定義リスト
     Dim refTypeNames As Collection
     Set refTypeNames = New Collection
     
@@ -1565,33 +1600,86 @@ Private Sub 移行_共通型定義(targetWBK As Workbook, strPathName As String)
     '---------------------------------------------------------------------------
     '　各型定義シート内の共通型の部分にファイルIDを設定する処理
     '---------------------------------------------------------------------------
-    '---------------------------------------------------------------------------
-    ' シート毎の処理
-    '---------------------------------------------------------------------------
+    Call Do参照型定義抽出処理(targetWBK, refTypeNames, CommonTypes, strPathName)
+    
+    If refTypeNames.count > 0 Then
+        '---------------------------------------------------------------------------
+        '　参照ファイル一覧の作成処理
+        '---------------------------------------------------------------------------
+        Call Do参照ファイル一覧作成処理(targetWBK, refTypeNames)
+          
+        '---------------------------------------------------------------------------
+        '　共通型となるシートを別名保存する処理
+        '---------------------------------------------------------------------------
+        Call Do共通型別名保存処理(targetWBK, refTypeNames, strPathName)
+    
+        '---------------------------------------------------------------------------
+        '　ID違いのファイルがある場合にリネームする処理
+        '---------------------------------------------------------------------------
+        Call Do共通型リネーム処理(targetWBK, refTypeNames, strPathName)
+        
+    End If
+    
+    
+    Call LogEnd("移行_共通型定義", targetWBK.Name)
+    
+        
+End Sub
+
+'*******************************************************************************
+' 参照型定義抽出処理
+'*******************************************************************************
+Sub Do参照型定義抽出処理(targetWBK As Workbook, refTypeNames As Collection, CommonTypes As Collection, strPathName As String)
+    Dim aSheet As Worksheet
+    If targetWBK Is Nothing Then
+        Exit Sub
+    End If
     For Each aSheet In targetWBK.Sheets
+
         If InStr(aSheet.Name, TARGET_SHEET_PREFIX_NEW) = 1 Then
             '---------------------------------------------------------------------------
             ' 行毎の処理
             '---------------------------------------------------------------------------
             Dim j As Integer
-            Dim refTypeName As String, itm As Variant
-            For j = 2 To aSheet.Cells(aSheet.Rows.Count, 1).End(xlUp).row
-                '一旦クリア
-                aSheet.Cells(j, COL_NEW_TYPEDEF_FILE_ID) = ""
+            Dim refTypeName As String, itm As Variant, bufWb As Workbook
+            For j = 2 To aSheet.Cells(aSheet.Rows.count, 1).End(xlUp).row
                 refTypeName = aSheet.Cells(j, COL_NEW_TYPEDEF_TYPE_NAME)
                 If Len(refTypeName) > 0 Then
+                    Dim exists As Boolean: exists = False
+                    
                     For Each itm In CommonTypes
                         '一致するものがあればIDを記入する。
                         If InStr(CStr(itm), refTypeName & ":") = 1 Then
-                            aSheet.Cells(j, COL_NEW_TYPEDEF_FILE_ID) = Mid(itm, Len(refTypeName) + 2)
+                            exists = True
+                            'セルの値が異なる場合のみ更新
+                            Call UpdateCell(aSheet, j, COL_NEW_TYPEDEF_FILE_ID, Mid(itm, Len(refTypeName) + 2))
+
+                            If ContainsItem(refTypeNames, CStr(itm)) = False Then
+                                Call refTypeNames.Add(itm)
+                                If GetSheet(targetWBK, TARGET_SHEET_PREFIX_NEW & refTypeName) Is Nothing Then
+                                    Set bufWb = OpenWorkBook(strPathName & cnsYEN & GenCommonTypeFileName(CStr(itm)), False, True, False)
+                                    If Not bufWb Is Nothing Then
+                                        Call Do参照型定義抽出処理(bufWb, refTypeNames, CommonTypes, strPathName)
+                                        bufWb.Close SaveChanges:=False
+                                    End If
+                                End If
+                            End If
                         End If
                     Next
+                    If Not exists Then
+                        'セルの値が異なる場合のみ更新
+                        Call UpdateCell(aSheet, j, COL_NEW_TYPEDEF_FILE_ID, "")
+                    End If
+
                     If aSheet.Cells(j, COL_NEW_TYPEDEF_FILE_ID) = "" Then
-                        Debug.Print "シート「" & aSheet.Name & "」に記載の型「" & refTypeName & "」は対象のシートが存在しません。"
+                        If GetSheet(targetWBK, TARGET_SHEET_PREFIX_NEW & refTypeName) Is Nothing Then
+                            Call LogErrorHandle("シート「" & aSheet.Name & "」に記載の型「" & refTypeName & "」は対象のシートが存在しません。", "", "")
+                        End If
                     End If
                 End If
             Next
             
+            Dim typeWb As Workbook
             For Each itm In CommonTypes
                 If InStr(CStr(itm), Mid(aSheet.Name, 5) & ":") = 1 Then
                     If ContainsItem(refTypeNames, CStr(itm)) = False Then
@@ -1600,26 +1688,18 @@ Private Sub 移行_共通型定義(targetWBK As Workbook, strPathName As String)
                 End If
             Next
         End If
+    
     Next
-    
-    If refTypeNames.Count > 0 Then
-        '---------------------------------------------------------------------------
-        '　参照ファイル一覧の作成処理
-        '---------------------------------------------------------------------------
-        Call Do参照ファイル一覧作成処理(targetWBK, refTypeNames)
-        
-        
-        '---------------------------------------------------------------------------
-        '　共通型となるシートを別名保存する処理
-        '---------------------------------------------------------------------------
-        Call Do共通型別名保存処理(targetWBK, refTypeNames, strPathName)
-    
+
+End Sub
+
+'*******************************************************************************
+' 更新処理
+'*******************************************************************************
+Sub UpdateCell(aSheet As Worksheet, rowId As Integer, colId As Integer, val As Variant)
+    If CStr(aSheet.Cells(rowId, colId)) <> CStr(val) Then
+        aSheet.Cells(rowId, colId) = val
     End If
-    
-    
-    Call LogEnd("移行_共通型定義", targetWBK.Name)
-    
-        
 End Sub
 
 
@@ -1643,7 +1723,7 @@ End Function
 '*******************************************************************************
 Private Sub Do共通型別名保存処理(objWBK As Workbook, list As Collection, strPathName As String)
     '---------------------------------------------------------------------------
-    Dim typeSheet As Worksheet, item As Variant
+    Dim item As Variant
     
     For Each item In list
         Call 別名保存処理( _
@@ -1662,6 +1742,7 @@ Private Sub 別名保存処理(objWBK As Workbook, tgtSheet As Worksheet, fileName As 
 
     Call LogStart("別名保存処理", objWBK.Name & ":" & fileName)
     
+    '参照型定義一覧の型が処理中のBookに存在した場合に、別名保存処理を実施する。
     If tgtSheet Is Nothing Then
         Exit Sub
     End If
@@ -1706,3 +1787,63 @@ Private Sub 別名保存処理(objWBK As Workbook, tgtSheet As Worksheet, fileName As 
     Call LogEnd("別名保存処理", objWBK.Name & ":" & fileName)
     
 End Sub
+
+'*******************************************************************************
+' 共通型でID違いのファイルがあればリネームする。
+'*******************************************************************************
+Private Sub Do共通型リネーム処理(objWBK As Workbook, CommonTypes As Collection, strPathName As String)
+
+    Dim buf As String, item As Variant, searchPath As String
+    For Each item In CommonTypes
+        searchPath = "他システムインターフェース仕様書_IFASW*" & _
+                            "I_" & _
+                            Mid(item, 1, InStr(item, ":") - 1) & ".xlsx"
+                            
+        buf = Dir(strPathName & cnsYEN & searchPath, vbNormal)
+        If buf <> "" Then
+            If buf <> GenCommonTypeFileName(CStr(item)) Then
+                Dim buf2 As String
+                buf2 = Dir(strPathName & cnsYEN & GenCommonTypeFileName(CStr(item)))
+                If buf2 = "" Then
+                    Call debugLog("リネーム:「" & buf & "」=>「" & GenCommonTypeFileName(CStr(item)) & "」", OUTPUT_LOG)
+                    'リネーム
+                    Name strPathName & cnsYEN & buf As strPathName & cnsYEN & GenCommonTypeFileName(CStr(item))
+                Else
+                    Call debugLog(buf & "は不要なファイルです。" & buf2 & "が存在します。", OUTPUT_LOG)
+                End If
+            End If
+        End If
+CONTINUE:
+    Next
+End Sub
+
+'*******************************************************************************
+' 指定のワークブックをオープンする。
+'*******************************************************************************
+Function OpenWorkBook(filePath As String, updateLinks_ As Boolean, readOnly_ As Boolean, Optional msgFlg As Boolean) As Workbook
+    If IsMissing(msgFlg) Then
+        msgFlg = True
+    End If
+    Dim buf As String, wb As Workbook
+    ''ファイルの存在チェック
+    buf = Dir(filePath)
+    If buf = "" Then
+        If msgFlg Then
+            MsgBox filePath & vbCrLf & "は存在しません", vbExclamation
+        End If
+        Exit Function
+    End If
+    ''同名ブックのチェック
+    For Each wb In Workbooks
+        If wb.Name = buf Then
+            If msgFlg Then
+                MsgBox buf & vbCrLf & "はすでに開いています", vbExclamation
+            End If
+            Exit Function
+        End If
+    Next wb
+    
+    Set OpenWorkBook = Workbooks.Open(fileName:=filePath, _
+                                updateLinks:=updateLinks_, _
+                                readOnly:=readOnly_)
+End Function
